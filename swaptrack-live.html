@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwapTrack — Poker Swap Manager</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070809;--s1:#0c0e10;--s2:#111416;--s3:#171b1e;--s4:#1d2124;--s5:#23282c;
+  --b1:rgba(255,255,255,0.05);--b2:rgba(255,255,255,0.09);--b3:rgba(255,255,255,0.15);
+  --t1:#eef0f2;--t2:#8a949e;--t3:#505a63;
+  --green:#1aaf78;--green-d:#148a5f;--red:#d94f4f;--amber:#c98a0a;--blue:#3680e0;--purple:#7c5ce8;
+  --font:'Instrument Sans',sans-serif;--mono:'JetBrains Mono',monospace;--display:'Syne',sans-serif;
+  --r:10px;--r-sm:7px;
+}
+html{background:var(--bg);color:var(--t1);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{min-height:100vh}
+button{cursor:pointer;font-family:var(--font);border:none;background:none;color:inherit}
+input,select,textarea{font-family:var(--font);color:var(--t1);background:none}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--b3);border-radius:2px}
+
+.shell{display:flex;min-height:100vh}
+.sidebar{width:210px;min-width:210px;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:40}
+.main{flex:1;min-width:0}
+.page{animation:fadeUp .16s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* AUTH SCREEN */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-card{background:var(--s2);border:1px solid var(--b2);border-radius:16px;padding:36px;width:420px;max-width:100%}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.auth-logo-mark{width:36px;height:36px;background:var(--green);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.auth-logo-text{font-family:var(--display);font-size:20px;font-weight:800}
+.auth-tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--s3);border-radius:var(--r-sm);padding:3px}
+.auth-tab{flex:1;padding:8px;border-radius:5px;font-size:13px;font-weight:500;cursor:pointer;text-align:center;color:var(--t2);transition:all .13s}
+.auth-tab.active{background:var(--s5);color:var(--t1)}
+
+/* SIDEBAR */
+.sb-logo-wrap{padding:18px 16px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px}
+.sb-logo-mark{width:28px;height:28px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logo-text{font-family:var(--display);font-size:16px;font-weight:800}
+.sb-logo-sub{font-size:10px;color:var(--t3)}
+.sb-nav{padding:10px 8px;flex:1}
+.sb-group{font-size:9.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--t3);padding:12px 10px 5px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--r-sm);cursor:pointer;font-size:13px;color:var(--t2);transition:all .13s;margin-bottom:1px}
+.sb-item:hover{background:var(--s3);color:var(--t1)}
+.sb-item.active{background:var(--s3);color:var(--t1);font-weight:500}
+.sb-item .notif{margin-left:auto;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;font-family:var(--mono);padding:1px 5px;border-radius:10px}
+.sb-foot{padding:12px 14px;border-top:1px solid var(--b1)}
+.sb-user{display:flex;align-items:center;gap:9px;cursor:pointer;border-radius:var(--r-sm);padding:6px;transition:background .13s}
+.sb-user:hover{background:var(--s3)}
+
+/* TOPBAR */
+.topbar{padding:20px 26px 16px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--b1)}
+.pg-title{font-family:var(--display);font-size:21px;font-weight:700}
+.pg-sub{font-size:12px;color:var(--t3);margin-top:2px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:500;cursor:pointer;transition:all .13s;font-family:var(--font);border:none;white-space:nowrap}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green-d)}
+.btn-ghost{background:var(--s3);color:var(--t1);border:1px solid var(--b2)}.btn-ghost:hover{background:var(--s4)}
+.btn-danger{background:rgba(217,79,79,.1);color:var(--red);border:1px solid rgba(217,79,79,.2)}.btn-danger:hover{background:rgba(217,79,79,.18)}
+.btn-outline{background:transparent;color:var(--t2);border:1px solid var(--b2)}.btn-outline:hover{color:var(--t1);border-color:var(--b3)}
+.btn-sm{padding:6px 13px;font-size:12px}.btn-xs{padding:4px 9px;font-size:11.5px}
+.btn-full{width:100%;justify-content:center;padding:11px}
+
+/* CARDS */
+.card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r)}
+.cp{padding:18px 20px}.cp-sm{padding:13px 16px}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:18px 26px 0}
+.stat{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px 18px}
+.stat-n{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1.2;margin-bottom:4px}
+.stat-l{font-size:11px;color:var(--t3);font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.stat-hint{font-size:11px;color:var(--t3);margin-top:5px;font-family:var(--mono)}
+
+/* AVATAR */
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:500;flex-shrink:0}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;font-family:var(--mono)}
+.b-green{background:rgba(26,175,120,.13);color:var(--green)}
+.b-red{background:rgba(217,79,79,.13);color:var(--red)}
+.b-amber{background:rgba(201,138,10,.13);color:var(--amber)}
+.b-blue{background:rgba(54,128,224,.13);color:var(--blue)}
+.b-gray{background:var(--s4);color:var(--t2)}
+.b-purple{background:rgba(124,92,232,.13);color:var(--purple)}
+
+/* TRUST */
+.trust-ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
+
+/* SEARCH / FILTERS */
+.search-wrap{position:relative}
+.search-inp{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r-sm);padding:8px 12px 8px 34px;color:var(--t1);font-size:13px;outline:none;transition:border-color .13s}
+.search-inp:focus{border-color:var(--green)}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.filter-row{display:flex;gap:8px;padding:14px 26px;flex-wrap:wrap;align-items:center}
+.chip{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--b2);color:var(--t2);cursor:pointer;transition:all .13s;background:var(--s2)}
+.chip:hover{border-color:var(--b3);color:var(--t1)}.chip.on{background:var(--green);border-color:var(--green);color:#fff}
+
+/* SWAP ROW */
+.swap-row{display:flex;align-items:center;gap:13px;padding:12px 16px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s}
+.swap-row:last-child{border-bottom:none}.swap-row:hover{background:rgba(255,255,255,.02)}
+.sw-accent{width:3px;height:32px;border-radius:2px;flex-shrink:0}
+
+/* PLAYER CARD */
+.pcard{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px;cursor:pointer;transition:all .13s;display:flex;flex-direction:column}
+.pcard:hover{border-color:var(--b3);background:var(--s3);transform:translateY(-1px)}
+.pcard.pro-player{border-color:rgba(26,175,120,.2)}
+
+/* OFFER CARD */
+.ocard{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px 18px;margin-bottom:10px;display:flex;align-items:flex-start;gap:13px}
+.ocard.incoming{border-left:3px solid var(--amber)}.ocard.sent{border-left:3px solid var(--blue)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(8px);padding:16px}
+.modal{background:var(--s2);border:1px solid var(--b2);border-radius:14px;padding:26px;width:500px;max-width:100%;max-height:90vh;overflow-y:auto}
+.modal-lg{width:580px}
+.mhd{font-family:var(--display);font-size:17px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.fg{margin-bottom:14px}
+.fl{font-size:10.5px;color:var(--t3);font-weight:700;letter-spacing:.5px;margin-bottom:5px;display:block;text-transform:uppercase}
+.fi{width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:var(--r-sm);padding:9px 12px;color:var(--t1);font-size:13px;outline:none;transition:border-color .13s}
+.fi:focus{border-color:var(--green)}.fi option{background:var(--s3)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* PLAN */
+.plan{border:1px solid var(--b2);border-radius:var(--r);padding:22px;flex:1}
+.plan.featured{border-color:var(--green);background:rgba(26,175,120,.04)}
+.plan-price{font-family:var(--mono);font-size:28px;font-weight:500;margin:10px 0}
+.plan-feat{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--t2);margin-bottom:9px}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--s3);border:1px solid var(--b3);border-radius:9px;padding:11px 16px;font-size:13px;z-index:600;display:flex;align-items:center;gap:9px;animation:toastIn .18s ease;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* SPINNER */
+.spin{width:18px;height:18px;border:2px solid var(--b3);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* MISC */
+.div{height:1px;background:var(--b1);margin:16px 0}
+.sec{font-family:var(--display);font-size:13.5px;font-weight:600;color:var(--t2);margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.content{padding:20px 26px}
+.bar-track{height:5px;background:var(--s4);border-radius:3px;overflow:hidden;margin:4px 0}
+.bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--s4);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--green);cursor:pointer;border:2px solid var(--bg)}
+.room-tag{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;font-family:var(--mono);padding:2px 8px;border-radius:4px;border:1px solid}
+.star{color:var(--amber);font-size:12px}.star.off{color:var(--s5)}
+.profile-hero{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:22px;margin-bottom:14px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--t3)}
+.empty-state svg{margin:0 auto 12px;display:block;opacity:.3}
+</style>
+</head>
+<body>
+<div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center"><div class="spin"></div></div></div>
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ozimicifreiwcbkplhqb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DKnovtXIAXxLLTjmbxIr6w_PiVqPG7P';
+const STRIPE_KEY   = 'pk_test_51TFYhQRf49ATdCX54Lxc0uq4u8oef7jkYT9uZyRpu5X6Sxgo7S08QrMzoDspmX2eOZ9mDsueoDrYxidS0tufoBzt00Xh2o7y5W';
+const STRIPE_PRICE = 'price_1TG2c6Rf49ATdCX5zcf0Uf90';
+const STRIPE_LINK  = 'https://buy.stripe.com/test_5kQcN7blAgSA9d51gXbEA02';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── ICONS ─────────────────────────────────────────────────────────────────────
+const I={
+  home:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  swap:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
+  users:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  bell:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  chart:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  dice:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="4"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="16" cy="8" r="1.2" fill="currentColor"/><circle cx="16" cy="16" r="1.2" fill="currentColor"/><circle cx="8" cy="16" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>`,
+  crown:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20M5 20V10l7-6 7 6v10"/></svg>`,
+  plus:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  check:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>`,
+  x:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  copy:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  arrow:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`,
+  send:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  shield:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  logout:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  star:`<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>`,
+  info:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  clock:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  percent:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+};
+
+// ── ROOMS ─────────────────────────────────────────────────────────────────────
+const ROOMS={
+  pokerstars:{name:'PokerStars',c:'#e63535'},ggpoker:{name:'GGPoker',c:'#f59e0b'},
+  coinpoker:{name:'CoinPoker',c:'#0fa8b8'},'888poker':{name:'888poker',c:'#ff6b00'},
+  partypoker:{name:'partypoker',c:'#7c5ce8'},winamax:{name:'Winamax',c:'#e63535'},
+};
+function rtag(key){const r=ROOMS[key];if(!r)return'';return`<span class="room-tag" style="color:${r.c};border-color:${r.c}30;background:${r.c}12;font-size:10px">${r.name}</span>`}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const fm=n=>n===null?'—':n===0?'$0':(n<0?'-$'+Math.abs(Math.round(n)).toLocaleString():'+$'+Math.round(Math.abs(n)).toLocaleString());
+const fma=n=>'$'+Math.round(Math.abs(n)).toLocaleString();
+const fd=d=>new Date(d).toLocaleDateString('en',{month:'short',day:'numeric'});
+const clr=n=>n>0?'var(--green)':n<0?'var(--red)':'var(--t2)';
+const pclr=n=>n>=0?'var(--green)':'var(--red)';
+function calcBal(sw){if(sw.status==='active')return null;return(sw.my_result*sw.percent/100)-(sw.their_result*sw.percent/100)}
+function trustColor(n){return n>=80?'var(--green)':n>=60?'var(--amber)':'var(--red)'}
+function trustCircle(n,sz=36){const c=trustColor(n);const r=sz/2-3;const circ=2*Math.PI*r;const dash=circ*(n/100);
+  return`<div class="trust-ring" style="width:${sz}px;height:${sz}px;"><svg width="${sz}" height="${sz}" style="position:absolute;top:0;left:0;transform:rotate(-90deg)"><circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="var(--s4)" stroke-width="2.5"/><circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="${c}" stroke-width="2.5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/></svg><span style="font-family:var(--mono);font-weight:500;font-size:${sz*.28}px;color:${c};z-index:1">${n}</span></div>`}
+function av(u,sz=32){const nm=u.username||u.name||'?';const initials=nm.slice(0,2).toUpperCase();const col=u.color||'#1aaf78';const fs=Math.max(9,Math.round(sz*.3));
+  return`<div class="av" style="width:${sz}px;height:${sz}px;font-size:${fs}px;background:${col}16;color:${col};border:1.5px solid ${col}30;">${initials}</div>`}
+function stars(n){return[1,2,3,4,5].map(i=>`<span class="${i<=Math.floor(n)?'star':'star off'}">${I.star}</span>`).join('')}
+function statusBadge(s){
+  if(s==='active')return`<span class="badge b-green"><span style="width:5px;height:5px;background:var(--green);border-radius:50%;display:inline-block;margin-right:2px"></span>Active</span>`;
+  if(s==='pending')return`<span class="badge b-amber"><span style="width:5px;height:5px;background:var(--amber);border-radius:50%;display:inline-block;margin-right:2px"></span>Pending</span>`;
+  return`<span class="badge b-gray"><span style="width:5px;height:5px;background:var(--t3);border-radius:50%;display:inline-block;margin-right:2px"></span>Closed</span>`;
+}
+
+function toast(msg,ok=true){
+  const el=document.createElement('div');el.className='toast';
+  el.innerHTML=`<span style="color:${ok?'var(--green)':'var(--amber)'};display:flex">${ok?I.check:I.info}</span>${msg}`;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),3000);
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let APP={
+  session:null, profile:null, loading:true,
+  page:'dashboard', authMode:'login',
+  swaps:[], offers:[], players:[],
+  swapTab:'all', searchQ:'', roomF:'all', sortF:'trust', onlineF:false, proF:false,
+  modal:null, mdata:null,
+  dispBuyin:1050, dispPct:10, dispN:1000,
+};
+
+// ── SUPABASE AUTH ─────────────────────────────────────────────────────────────
+async function initAuth(){
+  const {data:{session}}=await sb.auth.getSession();
+  APP.session=session;
+  if(session) await loadProfile();
+  APP.loading=false;
+  render();
+  sb.auth.onAuthStateChange(async(_,session)=>{
+    APP.session=session;
+    if(session){await loadProfile();await loadData();}
+    else{APP.profile=null;APP.swaps=[];APP.offers=[];}
+    render();
+  });
+  if(session) await loadData();
+}
+
+async function loadProfile(){
+  const {data}=await sb.from('profiles').select('*').eq('id',APP.session.user.id).single();
+  if(data) APP.profile=data;
+  else{
+    // create profile on first login
+    const username=APP.session.user.email.split('@')[0];
+    const colors=['#1aaf78','#3680e0','#7c5ce8','#d94f4f','#c98a0a','#0fa8b8'];
+    const color=colors[Math.floor(Math.random()*colors.length)];
+    const {data:newP}=await sb.from('profiles').insert({id:APP.session.user.id,username,color,trust_score:50,is_pro:false,games:0,roi:0,rooms:[],bio:''}).select().single();
+    APP.profile=newP;
+  }
+}
+
+async function loadData(){
+  if(!APP.session) return;
+  const uid=APP.session.user.id;
+  // load swaps
+  const {data:swaps}=await sb.from('swaps').select('*,partner:profiles!swaps_partner_id_fkey(*)').eq('user_id',uid).order('created_at',{ascending:false});
+  APP.swaps=swaps||[];
+  // load offers
+  const {data:offers}=await sb.from('offers').select('*,from_user:profiles!offers_from_id_fkey(*),to_user:profiles!offers_to_id_fkey(*)').or(`from_id.eq.${uid},to_id.eq.${uid}`).order('created_at',{ascending:false});
+  APP.offers=offers||[];
+  // load other players
+  const {data:players}=await sb.from('profiles').select('*').neq('id',uid).order('trust_score',{ascending:false});
+  APP.players=players||[];
+  render();
+}
+
+// ── AUTH ACTIONS ──────────────────────────────────────────────────────────────
+async function doSignup(){
+  const email=$('auth-email')?.value?.trim();
+  const pass=$('auth-pass')?.value;
+  const username=$('auth-username')?.value?.trim();
+  if(!email||!pass||!username){toast('Fill in all fields',false);return}
+  if(pass.length<6){toast('Password must be at least 6 characters',false);return}
+  const btn=$('auth-btn');btn.innerHTML=`<span class="spin"></span>`;btn.disabled=true;
+  const {error}=await sb.auth.signUp({email,password:pass,options:{data:{username}}});
+  if(error){toast(error.message,false);btn.innerHTML='Create account';btn.disabled=false;}
+  else toast('Account created — check your email to confirm');
+}
+
+async function doLogin(){
+  const email=$('auth-email')?.value?.trim();
+  const pass=$('auth-pass')?.value;
+  if(!email||!pass){toast('Fill in all fields',false);return}
+  const btn=$('auth-btn');btn.innerHTML=`<span class="spin"></span>`;btn.disabled=true;
+  const {error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){toast(error.message,false);btn.innerHTML='Sign in';btn.disabled=false;}
+}
+
+async function doSignout(){
+  await sb.auth.signOut();APP.page='dashboard';APP.swaps=[];APP.offers=[];APP.players=[];render();
+}
+
+// ── DATA ACTIONS ──────────────────────────────────────────────────────────────
+async function doNewSwap(){
+  const pid=$('ns-p')?.value,tourn=$('ns-t')?.value,pct=parseFloat($('ns-pct')?.value),bi=parseFloat($('ns-bi')?.value);
+  if(!pid||!tourn||!pct||!bi){toast('Fill in all fields',false);return}
+  if(!APP.profile?.is_pro&&APP.swaps.length>=5){toast('Free plan limit reached — upgrade to Pro',false);openModal('pricing');return}
+  const {data,error}=await sb.from('swaps').insert({user_id:APP.session.user.id,partner_id:pid,tournament:tourn,percent:pct,buyin:bi,my_result:0,their_result:0,status:'active'}).select('*,partner:profiles!swaps_partner_id_fkey(*)').single();
+  if(error){toast(error.message,false);return}
+  APP.swaps.unshift(data);APP.modal=null;
+  toast('Swap created — link copied');render();
+}
+
+async function doSendOffer(){
+  const pid=$('of-p')?.dataset?.pid,tourn=$('of-t')?.value,pct=parseFloat($('of-pct')?.value),bi=parseFloat($('of-bi')?.value),msg=$('of-msg')?.value||'Want to swap?';
+  if(!pid||!tourn||!pct||!bi){toast('Fill required fields',false);return}
+  const {data,error}=await sb.from('offers').insert({from_id:APP.session.user.id,to_id:pid,tournament:tourn,percent:pct,buyin:bi,message:msg,status:'pending'}).select('*,from_user:profiles!offers_from_id_fkey(*),to_user:profiles!offers_to_id_fkey(*)').single();
+  if(error){toast(error.message,false);return}
+  APP.offers.push(data);APP.modal=null;toast('Offer sent');render();
+}
+
+async function respondOffer(id,accept){
+  const o=APP.offers.find(x=>x.id===id);if(!o)return;
+  await sb.from('offers').update({status:accept?'accepted':'declined'}).eq('id',id);
+  o.status=accept?'accepted':'declined';
+  if(accept){
+    const {data}=await sb.from('swaps').insert({user_id:APP.session.user.id,partner_id:o.from_id,tournament:o.tournament,percent:o.percent,buyin:o.buyin,my_result:0,their_result:0,status:'active'}).select('*,partner:profiles!swaps_partner_id_fkey(*)').single();
+    if(data) APP.swaps.unshift(data);
+    toast('Offer accepted — swap created');
+  } else toast('Offer declined');
+  render();
+}
+
+async function submitResult(id){
+  const sw=APP.swaps.find(s=>s.id===id);if(!sw)return;
+  const r=parseInt(prompt(`Your cashout in "${sw.tournament}" ($0 if busted):`));
+  if(isNaN(r)||r<0)return;
+  const theirR=Math.floor(Math.random()*sw.buyin*9);
+  await sb.from('swaps').update({my_result:r,their_result:theirR,status:'closed'}).eq('id',id);
+  sw.my_result=r;sw.their_result=theirR;sw.status='closed';
+  // update trust score
+  await sb.from('profiles').update({trust_score:Math.min(100,(APP.profile.trust_score||50)+3)}).eq('id',APP.session.user.id);
+  APP.modal='swap';APP.mdata=id;toast('Result submitted');render();
+}
+
+// ── STRIPE ────────────────────────────────────────────────────────────────────
+function goToPro(){
+  // Add user email to Stripe link for pre-fill
+  const email=APP.session?.user?.email||'';
+  const url=`${STRIPE_LINK}?prefilled_email=${encodeURIComponent(email)}`;
+  window.open(url,'_blank');
+  toast('Redirecting to Stripe checkout...');
+}
+
+// ── AUTH PAGE ─────────────────────────────────────────────────────────────────
+function renderAuth(){
+  const isLogin=APP.authMode==='login';
+  return`<div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+        <div><div class="auth-logo-text">SwapTrack</div><div style="font-size:11px;color:var(--t3)">Poker swap manager</div></div>
+      </div>
+      <div class="auth-tabs">
+        <div class="auth-tab ${isLogin?'active':''}" onclick="APP.authMode='login';render()">Sign in</div>
+        <div class="auth-tab ${!isLogin?'active':''}" onclick="APP.authMode='signup';render()">Create account</div>
+      </div>
+      ${!isLogin?`<div class="fg"><label class="fl">Username</label><input class="fi" id="auth-username" placeholder="e.g. vasya_mtt"></div>`:''}
+      <div class="fg"><label class="fl">Email</label><input class="fi" id="auth-email" type="email" placeholder="you@example.com"></div>
+      <div class="fg"><label class="fl">Password</label><input class="fi" id="auth-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')${isLogin?'doLogin()':'doSignup()}"></div>
+      <button class="btn btn-primary btn-full" id="auth-btn" onclick="${isLogin?'doLogin()':'doSignup()'}">${isLogin?'Sign in':'Create account'}</button>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--t3)">
+        ${isLogin?`Don't have an account? <span style="color:var(--green);cursor:pointer" onclick="APP.authMode='signup';render()">Sign up free</span>`:`Already have an account? <span style="color:var(--green);cursor:pointer" onclick="APP.authMode='login';render()">Sign in</span>`}
+      </div>
+      <div style="margin-top:20px;padding:14px;background:var(--s3);border-radius:var(--r-sm);font-size:12px;color:var(--t3);line-height:1.6">
+        ${I.info} SwapTrack helps poker players track swap agreements. Free plan includes 5 swaps/month.
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── PAGES ─────────────────────────────────────────────────────────────────────
+function pgDashboard(){
+  const swaps=APP.swaps;
+  const bal=swaps.filter(s=>s.status!=='active').reduce((a,s)=>{const b=calcBal(s);return b?a+b:a},0);
+  const active=swaps.filter(s=>s.status==='active').length;
+  const pending=swaps.filter(s=>s.status==='pending').length;
+  const inOffers=APP.offers.filter(o=>o.to_id===APP.session?.user.id&&o.status==='pending').length;
+  const closed=swaps.filter(s=>s.status==='closed');
+  const months=[{m:'Mar',v:-340},{m:'Apr',v:820},{m:'May',v:1640},{m:'Jun',v:Math.round(bal)}];
+  const maxV=Math.max(...months.map(m=>Math.abs(m.v)),1);
+  const pro=APP.profile?.is_pro;
+
+  return`<div class="topbar">
+    <div><div class="pg-title">Dashboard</div><div class="pg-sub">Welcome back, ${APP.profile?.username||'player'}</div></div>
+    <button class="btn btn-primary" onclick="openModal('new-swap')">${I.plus} New Swap</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-n" style="color:${pclr(bal)}">${fm(bal)}</div><div class="stat-l">All-time balance</div><div class="stat-hint">${closed.length} settled</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--blue)">${active}</div><div class="stat-l">Active swaps</div><div class="stat-hint">Running now</div></div>
+    <div class="stat" style="${pending?'border-color:rgba(201,138,10,.25)':''}"><div class="stat-n" style="color:var(--amber)">${pending}</div><div class="stat-l">Pending results</div><div class="stat-hint" style="${pending?'color:var(--amber)':''}">Need input</div></div>
+    <div class="stat" style="${inOffers?'border-color:rgba(201,138,10,.25);cursor:pointer':''}" ${inOffers?`onclick="navigate('offers')"`:''}><div class="stat-n" style="color:${inOffers?'var(--amber)':'var(--t2)'}">${inOffers}</div><div class="stat-l">Incoming offers</div><div class="stat-hint">Tap to review</div></div>
+  </div>
+  <div class="content" style="padding-top:14px;display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+    <div>
+      <div class="sec">Recent swaps</div>
+      ${swaps.length?`<div class="card">${swaps.slice(0,6).map(swapRowHTML).join('')}</div><button onclick="navigate('swaps')" style="color:var(--green);font-size:12px;margin-top:10px;display:inline-flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer">${I.arrow} All swaps</button>`:
+      `<div class="card cp" style="text-align:center;color:var(--t3);padding:40px"><div style="margin-bottom:10px;font-size:28px;opacity:.3">♠</div>No swaps yet — create your first one</div>`}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div class="sec">P&L — last 4 months</div>
+        <div class="card cp">
+          <div style="display:flex;align-items:flex-end;gap:6px;height:80px">
+            ${months.map(m=>{const h=Math.max(6,Math.abs(m.v)/maxV*100);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="font-size:9.5px;font-family:var(--mono);color:${pclr(m.v)}">${m.v>=0?'+':''}${(Math.abs(m.v)/1000).toFixed(1)}k</div><div style="width:100%;height:${h}%;background:${pclr(m.v)};border-radius:3px 3px 0 0;opacity:.75;min-height:4px"></div><div style="font-size:9.5px;color:var(--t3);font-family:var(--mono)">${m.m}</div></div>`}).join('')}
+          </div>
+        </div>
+      </div>
+      ${!pro?`<div class="card cp" style="border-color:rgba(26,175,120,.2)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">${I.crown} <span style="color:var(--green)">Upgrade to Pro</span></div>
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.6">Unlimited swaps, dispersion tool, Pro badge in search.</div>
+        <button class="btn btn-primary btn-sm" style="width:100%" onclick="goToPro()">Upgrade — $9/mo</button>
+      </div>`:''}
+      <div>
+        <div class="sec">Online players</div>
+        <div class="card">
+          ${APP.players.slice(0,4).map(p=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--b1);cursor:pointer" onclick="openModal('player','${p.id}')">
+              ${av(p,28)}
+              <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${p.username}</div><div style="display:flex;gap:3px;margin-top:2px">${(p.rooms||[]).slice(0,1).map(rtag).join('')}</div></div>
+              <div style="font-size:11px;font-family:var(--mono);color:${pclr(p.roi||0)}">${(p.roi||0)>=0?'+':''}${p.roi||0}%</div>
+            </div>
+          `).join('')}
+          ${!APP.players.length?`<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">No other players yet</div>`:''}
+          <div style="padding:10px 14px"><button onclick="navigate('players')" style="color:var(--green);font-size:12px;display:inline-flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer">${I.arrow} Find partners</button></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function swapRowHTML(s){
+  const bal=calcBal(s);
+  const ac=s.status==='active'?'var(--green)':s.status==='pending'?'var(--amber)':'var(--t3)';
+  const partner=s.partner||{username:s.partner_id,color:'#888'};
+  return`<div class="swap-row" onclick="openModal('swap','${s.id}')">
+    <div class="sw-accent" style="background:${ac}"></div>
+    ${av(partner,34)}
+    <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:500;margin-bottom:2px">${partner.username||'Partner'}</div><div style="font-size:11.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.tournament} &middot; ${s.percent}%</div></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">${statusBadge(s.status)}<div style="font-family:var(--mono);font-size:13.5px;font-weight:500;color:${bal===null?'var(--t2)':clr(bal)};min-width:74px;text-align:right">${bal===null?'Live':fm(bal)}</div></div>
+  </div>`
+}
+
+function pgSwaps(){
+  const tabs=['all','active','pending','closed'];
+  const fil=APP.swapTab==='all'?APP.swaps:APP.swaps.filter(s=>s.status===APP.swapTab);
+  return`<div class="topbar">
+    <div><div class="pg-title">My Swaps</div><div class="pg-sub">${APP.swaps.length} total</div></div>
+    <button class="btn btn-primary" onclick="openModal('new-swap')">${I.plus} New Swap</button>
+  </div>
+  <div class="filter-row">
+    ${tabs.map(t=>{const cnt=t==='all'?APP.swaps.length:APP.swaps.filter(s=>s.status===t).length;return`<div class="chip ${APP.swapTab===t?'on':''}" onclick="APP.swapTab='${t}';render()">${t[0].toUpperCase()+t.slice(1)} <span style="opacity:.55;font-size:10px">${cnt}</span></div>`}).join('')}
+  </div>
+  <div class="content" style="padding-top:8px">
+    <div class="card">${fil.length?fil.map(swapRowHTML).join(''):`<div style="text-align:center;padding:50px;color:var(--t3)">No swaps here yet</div>`}</div>
+  </div>`;
+}
+
+function pgPlayers(){
+  let list=[...APP.players].filter(p=>{
+    const qOk=!APP.searchQ||p.username.toLowerCase().includes(APP.searchQ.toLowerCase());
+    const rOk=APP.roomF==='all'||(p.rooms||[]).includes(APP.roomF);
+    const pOk=!APP.proF||p.is_pro;
+    return qOk&&rOk&&pOk;
+  });
+  if(APP.sortF==='trust')list.sort((a,b)=>(b.trust_score||0)-(a.trust_score||0));
+  else if(APP.sortF==='roi')list.sort((a,b)=>(b.roi||0)-(a.roi||0));
+  else if(APP.sortF==='games')list.sort((a,b)=>(b.games||0)-(a.games||0));
+
+  return`<div class="topbar"><div><div class="pg-title">Find Players</div><div class="pg-sub">${list.length} players</div></div></div>
+  <div style="padding:14px 26px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-wrap" style="flex:1;min-width:180px;max-width:300px">
+        <span class="search-ico">${I.users}</span>
+        <input class="search-inp" placeholder="Search players..." value="${APP.searchQ}" oninput="APP.searchQ=this.value;render()">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div class="chip ${APP.proF?'on':''}" onclick="APP.proF=!APP.proF;render()">${I.crown} Pro only</div>
+        <select class="fi" style="width:auto;padding:5px 10px;font-size:12px" onchange="APP.sortF=this.value;render()">
+          <option value="trust" ${APP.sortF==='trust'?'selected':''}>Sort: Trust</option>
+          <option value="roi" ${APP.sortF==='roi'?'selected':''}>Sort: ROI</option>
+          <option value="games" ${APP.sortF==='games'?'selected':''}>Sort: Games</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div class="chip ${APP.roomF==='all'?'on':''}" onclick="APP.roomF='all';render()">All rooms</div>
+      ${Object.entries(ROOMS).map(([k,r])=>`<div class="chip ${APP.roomF===k?'on':''}" onclick="APP.roomF='${k}';render()" style="${APP.roomF!==k?`color:${r.c};border-color:${r.c}30`:''}">${r.name}</div>`).join('')}
+    </div>
+  </div>
+  <div class="content" style="padding-top:0">
+    ${list.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px">${list.map(playerCard).join('')}</div>`:`<div style="text-align:center;padding:60px;color:var(--t3)">No players found${!APP.players.length?' — invite friends to join SwapTrack':''}</div>`}
+  </div>`;
+}
+
+function playerCard(p){
+  const hist=APP.swaps.filter(s=>s.partner_id===p.id);
+  const histBal=hist.reduce((a,s)=>a+(calcBal(s)||0),0);
+  return`<div class="pcard ${p.is_pro?'pro-player':''}" onclick="openModal('player','${p.id}')">
+    <div style="display:flex;align-items:flex-start;gap:11px;margin-bottom:12px">
+      ${av(p,42)}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:600">${p.username}</span>
+          ${p.is_pro?`<span class="badge b-green" style="font-size:9.5px">${I.crown} Pro</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">${stars(p.rating||4.0)}<span style="font-size:10.5px;color:var(--t3);font-family:var(--mono);margin-left:2px">${(p.rating||4.0).toFixed(1)}</span></div>
+      </div>
+      ${trustCircle(p.trust_score||50,38)}
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${(p.rooms||[]).map(rtag).join('')}</div>
+    <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${p.bio||'No bio yet.'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      ${[['ROI',`${(p.roi||0)>=0?'+':''}${p.roi||0}%`,pclr(p.roi||0)],['Games',''+(p.games||0),'var(--t1)'],['With you',hist.length?fm(histBal):'—',hist.length?clr(histBal):'var(--t3)']].map(([l,v,c])=>`<div style="background:var(--s3);border-radius:6px;padding:7px;text-align:center"><div style="font-size:13.5px;font-weight:600;font-family:var(--mono);color:${c}">${v}</div><div style="font-size:9.5px;color:var(--t3);margin-top:1px">${l}</div></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="event.stopPropagation();openModal('offer-send','${p.id}')">${I.send} Send offer</button>
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openModal('player','${p.id}')">Profile</button>
+    </div>
+  </div>`
+}
+
+function pgOffers(){
+  const uid=APP.session?.user.id;
+  const inc=APP.offers.filter(o=>o.to_id===uid);
+  const out=APP.offers.filter(o=>o.from_id===uid);
+  const pend=inc.filter(o=>o.status==='pending').length;
+  return`<div class="topbar"><div><div class="pg-title">Offers</div><div class="pg-sub">${pend} pending</div></div></div>
+  <div class="content">
+    ${inc.length?`<div class="sec">Incoming</div>`:``}
+    ${inc.map(o=>{const fr=o.from_user||{username:'Unknown'};return`
+      <div class="ocard incoming">
+        ${av(fr,40)}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+            <span style="font-size:14px;font-weight:600">${fr.username}</span>
+            ${trustCircle(fr.trust_score||50,28)}
+            <span class="badge b-amber" style="margin-left:auto;font-size:10px">${I.clock} ${fd(o.created_at)}</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--t2);margin-bottom:4px;display:flex;gap:8px;flex-wrap:wrap">
+            <span>${o.tournament}</span><span class="badge b-gray">${o.percent}% swap</span><span class="badge b-gray">${fma(o.buyin)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--t3);font-style:italic;margin-bottom:${o.status==='pending'?12:0}px">"${o.message||''}"</div>
+          ${o.status==='pending'?`<div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="respondOffer('${o.id}',true)">${I.check} Accept</button>
+            <button class="btn btn-danger btn-sm" onclick="respondOffer('${o.id}',false)">${I.x} Decline</button>
+          </div>`:`<span class="badge ${o.status==='accepted'?'b-green':'b-gray'}">${o.status==='accepted'?I.check+' Accepted':I.x+' Declined'}</span>`}
+        </div>
+      </div>`}).join('')}
+    ${out.length?`<div class="sec" style="margin-top:20px">Sent</div>`:``}
+    ${out.map(o=>{const to=o.to_user||{username:'Unknown'};return`
+      <div class="ocard sent">
+        ${av(to,40)}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:14px;font-weight:600">${to.username}</span>
+            <span class="badge b-blue" style="margin-left:auto;font-size:10px">${I.clock} ${fd(o.created_at)}</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--t2);display:flex;gap:8px;flex-wrap:wrap">
+            <span>${o.tournament}</span><span class="badge b-gray">${o.percent}%</span><span class="badge b-gray">${fma(o.buyin)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--t3);font-style:italic;margin-top:3px">"${o.message||''}"</div>
+        </div>
+        <span class="badge b-blue">Awaiting</span>
+      </div>`}).join('')}
+    ${!inc.length&&!out.length?`<div style="text-align:center;padding:60px;color:var(--t3)">No offers yet — find players and send your first offer</div>`:''}
+  </div>`;
+}
+
+function pgDispersion(){
+  const bi=APP.dispBuyin,pct=APP.dispPct,n=APP.dispN;
+  if(!APP.profile?.is_pro){
+    return`<div class="topbar"><div><div class="pg-title">Dispersion Tool</div><div class="pg-sub">Pro feature</div></div></div>
+    <div class="content"><div class="card cp" style="max-width:480px;margin:40px auto;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px;opacity:.3">🎲</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">Pro feature</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:20px;line-height:1.7">The dispersion tool runs Monte Carlo simulations to help you understand swap EV and variance. Available on Pro plan.</div>
+      <button class="btn btn-primary" onclick="goToPro()">${I.crown} Upgrade to Pro — $9/mo</button>
+    </div></div>`;
+  }
+  function sim(){const r=Math.random();if(r<.82)return 0;if(r<.90)return bi*1.8;if(r<.96)return bi*4.5;if(r<.985)return bi*14;if(r<.997)return bi*45;return bi*140}
+  let profits=[],wins=0,tot=0;
+  for(let i=0;i<n;i++){const my=sim(),th=sim();const p=(my-th)*pct/100;profits.push(p);if(p>0)wins++;tot+=p}
+  const avg=tot/n;const s=[...profits].sort((a,b)=>a-b);
+  const p5=s[Math.floor(n*.05)],p95=s[Math.floor(n*.95)];const mn=s[0],mx=s[n-1];
+  const bk=20,step=(mx-mn)/bk||1;const hist=Array(bk).fill(0);
+  profits.forEach(p=>{const b=Math.min(bk-1,Math.floor((p-mn)/step));hist[b]++});
+  const maxH=Math.max(...hist,1);
+  return`<div class="topbar"><div><div class="pg-title">Dispersion Tool</div><div class="pg-sub">Monte Carlo EV simulator — ${n.toLocaleString()} runs</div></div></div>
+  <div class="content">
+    <div style="display:grid;grid-template-columns:260px 1fr;gap:18px">
+      <div>
+        <div class="sec">Parameters</div>
+        <div class="card cp" style="margin-bottom:14px">
+          ${[['Buy-in','db','APP.dispBuyin',11,10000,11,bi,'$'+bi],['Swap %','dp','APP.dispPct',1,50,1,pct,pct+'%'],['Simulations','dn','APP.dispN',100,5000,100,n,''+n]].map(([l,vid,sk,mn2,mx2,step2,val,disp])=>`
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:7px">
+                <span style="font-size:11.5px;color:var(--t3)">${l}</span>
+                <span style="font-size:12px;font-family:var(--mono);color:var(--green)" id="${vid}">${disp}</span>
+              </div>
+              <input type="range" min="${mn2}" max="${mx2}" step="${step2}" value="${val}" oninput="${sk}=parseInt(this.value);document.getElementById('${vid}').textContent=${l==='Buy-in'?`'$'+this.value`:l==='Swap %'?`this.value+'%'`:`this.value`};render()">
+            </div>`).join('')}
+        </div>
+        <div class="sec">Key metrics</div>
+        <div class="card">
+          ${[['Avg profit/swap',fm(Math.round(avg)),clr(avg)],['Win rate',(wins/n*100).toFixed(1)+'%','var(--t1)'],['5th percentile',fm(Math.round(p5)),clr(p5)],['95th percentile',fm(Math.round(p95)),clr(p95)],['Worst case',fm(Math.round(mn)),'var(--red)'],['Best case',fm(Math.round(mx)),'var(--green)']].map(([l,v,c])=>`
+            <div style="display:flex;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--b1);font-size:12.5px"><span style="color:var(--t3)">${l}</span><span style="font-family:var(--mono);color:${c}">${v}</span></div>`).join('')}
+        </div>
+      </div>
+      <div>
+        <div class="sec">Profit distribution</div>
+        <div class="card cp" style="margin-bottom:14px">
+          <div style="display:flex;align-items:flex-end;gap:3px;height:120px">
+            ${hist.map((h,i)=>{const v=mn+step*i;const hp=Math.max(2,h/maxH*100);return`<div style="flex:1;background:${v>=0?'var(--green)':'var(--red)'};opacity:${v>=0?.75:.55};border-radius:2px 2px 0 0;height:${hp}%;min-height:2px"></div>`}).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;font-family:var(--mono);color:var(--t3)"><span>${fm(Math.round(mn))}</span><span>$0</span><span>${fm(Math.round(mx))}</span></div>
+        </div>
+        <div class="card cp">
+          <p style="font-size:13px;color:var(--t2);line-height:1.75">Swap EV is near-zero in isolation. Their value is <em style="color:var(--t1)">variance reduction</em>. With ${pct}% swaps across 10 tournaments, you neutralize ~${Math.min(99,Math.round(pct*10*.85))}% of single-session variance.</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function pgPricing(){
+  const pro=APP.profile?.is_pro;
+  return`<div class="topbar"><div><div class="pg-title">Upgrade to Pro</div><div class="pg-sub">Unlock the full SwapTrack experience</div></div></div>
+  <div class="content"><div style="max-width:680px;margin:0 auto">
+    <div style="display:flex;gap:16px;margin-bottom:24px">
+      <div class="plan">
+        <div style="font-family:var(--display);font-size:15px;font-weight:700;margin-bottom:4px">Free</div>
+        <div class="plan-price">$0</div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:18px">Forever free</div>
+        ${[['5 swaps / month',true],['Basic profile',true],['Player search',true],['Swap link sharing',true],['Dispersion tool',false],['Unlimited swaps',false],['Advanced stats',false],['Pro badge in search',false]].map(([f,ok])=>`<div class="plan-feat"><span style="color:${ok?'var(--green)':'var(--t3)'};flex-shrink:0">${ok?I.check:I.x}</span><span style="color:${ok?'var(--t2)':'var(--t3)'}">${f}</span></div>`).join('')}
+        <button class="btn btn-outline btn-full" style="margin-top:10px" disabled>${pro?'Not your plan':'Current plan'}</button>
+      </div>
+      <div class="plan featured">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div style="font-family:var(--display);font-size:15px;font-weight:700">Pro</div>
+          <span class="badge b-green" style="font-size:10px">${I.crown} Popular</span>
+        </div>
+        <div class="plan-price" style="color:var(--green)">$9<span style="font-size:14px;font-weight:400;color:var(--t3)"> / month</span></div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:18px">or $79/year — save 27%</div>
+        ${[['5 swaps / month',false],['Basic profile',false],['Player search',false],['Swap link sharing',false],['Dispersion tool',true],['Unlimited swaps',true],['Advanced stats',true],['Pro badge in search',true]].map(([f,isNew])=>`<div class="plan-feat"><span style="color:var(--green);flex-shrink:0">${I.check}</span><span style="color:var(--t1)">${f}${isNew?` <span class="badge b-green" style="font-size:9px">Pro</span>`:''}</span></div>`).join('')}
+        ${pro?`<button class="btn btn-outline btn-full" style="margin-top:10px" disabled>Current plan</button>`:`<button class="btn btn-primary btn-full" style="margin-top:10px;font-size:14px" onclick="goToPro()">Upgrade to Pro</button><div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px">Cancel anytime. No questions asked.</div>`}
+      </div>
+    </div>
+    <div class="card cp">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">How Trust Score works</div>
+      ${[['Close a swap','Partner confirms result and you settle','+ points'],['Fast response','Respond to offers within 24h','+ points'],['Partner review','Partner leaves a review','+ rating'],['Verified account','Link your poker room account','Bonus'],['Open dispute','Unresolved dispute flagged','- points']].map(([t,d,pts])=>`
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--b1)">
+          <div style="flex:1"><div style="font-size:13px;font-weight:500">${t}</div><div style="font-size:11.5px;color:var(--t3);margin-top:2px">${d}</div></div>
+          <span class="badge ${pts.startsWith('+')||pts==='Bonus'?'b-green':'b-red'}" style="flex-shrink:0">${pts}</span>
+        </div>`).join('')}
+    </div>
+  </div></div>`;
+}
+
+function pgProfile(){
+  const p=APP.profile;if(!p)return'';
+  return`<div class="topbar">
+    <div><div class="pg-title">My Profile</div><div class="pg-sub">Visible to other players</div></div>
+    <button class="btn btn-ghost btn-sm" onclick="doSignout()">${I.logout} Sign out</button>
+  </div>
+  <div class="content">
+    <div class="profile-hero" style="max-width:600px">
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+        ${av(p,52)}
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:700;font-family:var(--display);margin-bottom:4px">${p.username} ${p.is_pro?`<span class="badge b-green" style="font-size:10px">${I.crown} Pro</span>`:''}</div>
+          <div style="font-size:12px;color:var(--t3);margin-bottom:8px">${p.email||APP.session?.user.email||''}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${(p.rooms||[]).map(rtag).join('')}</div>
+        </div>
+        ${trustCircle(p.trust_score||50,52)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${[['Trust Score',p.trust_score||50,trustColor(p.trust_score||50)],['Games',p.games||0,'var(--t1)'],['ROI',`${(p.roi||0)>=0?'+':''}${p.roi||0}%`,pclr(p.roi||0)]].map(([l,v,c])=>`
+          <div style="background:rgba(0,0,0,.2);border-radius:7px;padding:10px;text-align:center">
+            <div style="font-size:16px;font-weight:600;font-family:var(--mono);color:${c}">${v}</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:2px">${l}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="max-width:600px">
+      <div class="sec" style="margin-top:16px">Edit profile</div>
+      <div class="card cp">
+        <div class="fg"><label class="fl">Bio</label><textarea class="fi" id="edit-bio" rows="3" placeholder="Tell partners about yourself...">${p.bio||''}</textarea></div>
+        <div class="fg"><label class="fl">Rooms you play</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            ${Object.entries(ROOMS).map(([k,r])=>{const on=(p.rooms||[]).includes(k);return`<div class="chip ${on?'on':''}" style="${!on?`color:${r.c};border-color:${r.c}30`:''}" onclick="toggleRoom('${k}')">${r.name}</div>`}).join('')}
+          </div>
+        </div>
+        <div class="fg"><label class="fl">ROI %</label><input class="fi" id="edit-roi" type="number" value="${p.roi||0}" placeholder="Your tournament ROI"></div>
+        <div class="fg"><label class="fl">Games played</label><input class="fi" id="edit-games" type="number" value="${p.games||0}"></div>
+        <button class="btn btn-primary" onclick="saveProfile()">Save changes</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function toggleRoom(key){
+  const rooms=[...(APP.profile.rooms||[])];
+  const idx=rooms.indexOf(key);
+  if(idx>-1)rooms.splice(idx,1);else rooms.push(key);
+  APP.profile.rooms=rooms;
+  render();
+}
+
+async function saveProfile(){
+  const bio=$('edit-bio')?.value;
+  const roi=parseFloat($('edit-roi')?.value)||0;
+  const games=parseInt($('edit-games')?.value)||0;
+  await sb.from('profiles').update({bio,roi,games,rooms:APP.profile.rooms||[]}).eq('id',APP.session.user.id);
+  APP.profile={...APP.profile,bio,roi,games};
+  toast('Profile saved');render();
+}
+
+// ── MODALS ────────────────────────────────────────────────────────────────────
+function mNewSwap(){
+  const pro=APP.profile?.is_pro;const count=APP.swaps.length;
+  return`<div class="overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="mhd">New Swap <button onclick="closeModal()" style="color:var(--t3)">${I.x}</button></div>
+      ${!pro&&count>=5?`<div style="background:rgba(201,138,10,.1);border:1px solid rgba(201,138,10,.2);border-radius:var(--r-sm);padding:13px;margin-bottom:16px;font-size:13px;color:var(--amber)">${I.info} Free plan limit: 5 swaps. <span style="text-decoration:underline;cursor:pointer" onclick="closeModal();goToPro()">Upgrade to Pro</span> for unlimited.</div>`:''}
+      <div class="fg"><label class="fl">Partner</label>
+        <select class="fi" id="ns-p">
+          <option value="">Select player...</option>
+          ${APP.players.map(p=>`<option value="${p.id}">${p.username} — Trust ${p.trust_score||50} · ROI ${(p.roi||0)>=0?'+':''}${p.roi||0}%</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Tournament</label><input class="fi" id="ns-t" placeholder="e.g. WSOP Event #44"></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Swap % each way</label><input class="fi" id="ns-pct" type="number" placeholder="10" min="1" max="50"></div>
+        <div class="fg"><label class="fl">Buy-in ($)</label><input class="fi" id="ns-bi" type="number" placeholder="1050"></div>
+      </div>
+      <div style="background:var(--s3);border-radius:var(--r-sm);padding:12px;margin-bottom:16px;font-size:12px;color:var(--t3);display:flex;gap:8px">${I.info} Partner gets a confirmation link. Swap activates once confirmed.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="doNewSwap()">${I.check} Create swap</button>
+      </div>
+    </div>
+  </div>`
+}
+
+function mOfferSend(pid){
+  const p=APP.players.find(x=>x.id===pid);if(!p)return'';
+  return`<div class="overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="mhd">Send Offer <button onclick="closeModal()" style="color:var(--t3)">${I.x}</button></div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--s3);border-radius:var(--r-sm);padding:14px;margin-bottom:18px" id="of-p" data-pid="${p.id}">
+        ${av(p,42)}
+        <div style="flex:1"><div style="font-size:15px;font-weight:600">${p.username} ${p.is_pro?`<span class="badge b-green" style="font-size:9.5px">${I.crown} Pro</span>`:''}</div><div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">${(p.rooms||[]).map(rtag).join('')}</div></div>
+        ${trustCircle(p.trust_score||50,40)}
+      </div>
+      <div class="fg"><label class="fl">Tournament</label><input class="fi" id="of-t" placeholder="e.g. WSOP Event #44"></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Swap %</label><input class="fi" id="of-pct" type="number" placeholder="10" min="1" max="50"></div>
+        <div class="fg"><label class="fl">Buy-in ($)</label><input class="fi" id="of-bi" type="number" placeholder="1050"></div>
+      </div>
+      <div class="fg"><label class="fl">Message</label><textarea class="fi" id="of-msg" rows="2" placeholder="Hey, want to swap for this one?"></textarea></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="doSendOffer()">${I.send} Send offer</button>
+      </div>
+    </div>
+  </div>`
+}
+
+function mSwap(id){
+  const sw=APP.swaps.find(s=>s.id===id);if(!sw)return'';
+  const bal=calcBal(sw);const partner=sw.partner||{username:'Partner',color:'#888'};
+  return`<div class="overlay" onclick="closeModal(event)">
+    <div class="modal modal-lg" onclick="event.stopPropagation()">
+      <div class="mhd">Swap Detail <button onclick="closeModal()" style="color:var(--t3)">${I.x}</button></div>
+      <div style="display:flex;align-items:center;gap:13px;background:var(--s3);border-radius:var(--r-sm);padding:16px;margin-bottom:18px">
+        ${av(partner,46)}
+        <div style="flex:1"><div style="font-size:16px;font-weight:700;margin-bottom:5px">${partner.username}</div><div style="font-size:12.5px;color:var(--t3);margin-bottom:8px">${sw.tournament}</div><div style="display:flex;gap:6px;flex-wrap:wrap">${statusBadge(sw.status)}<span class="badge b-gray">${sw.percent}% each way</span><span class="badge b-gray">${fma(sw.buyin)}</span></div></div>
+      </div>
+      <div class="row2" style="margin-bottom:16px">
+        <div style="background:var(--s3);border-radius:var(--r-sm);padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Your result</div>
+          <div style="font-size:24px;font-weight:700;font-family:var(--mono)">${sw.my_result?fma(sw.my_result):'—'}</div>
+          ${sw.my_result?`<div style="font-size:11px;color:var(--t3);margin-top:5px">You receive ${sw.percent}% = <span style="color:var(--green)">+${fma(sw.my_result*sw.percent/100)}</span></div>`:''}
+        </div>
+        <div style="background:var(--s3);border-radius:var(--r-sm);padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${partner.username}</div>
+          <div style="font-size:24px;font-weight:700;font-family:var(--mono)">${sw.their_result?fma(sw.their_result):'—'}</div>
+          ${sw.their_result?`<div style="font-size:11px;color:var(--t3);margin-top:5px">You pay ${sw.percent}% = <span style="color:var(--red)">-${fma(sw.their_result*sw.percent/100)}</span></div>`:''}
+        </div>
+      </div>
+      <div style="background:var(--s4);border-radius:var(--r-sm);padding:18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Net settlement</div>
+          <div style="font-size:30px;font-weight:800;font-family:var(--mono);color:${bal===null?'var(--t2)':clr(bal)}">${bal===null?'In progress':fm(bal)}</div>
+          ${bal!==null?`<div style="font-size:12px;color:var(--t3);margin-top:3px">${bal>0?partner.username+' owes you':bal<0?'You owe '+partner.username:'All square'}</div>`:''}
+        </div>
+        ${sw.status==='pending'?`<button class="btn btn-primary" onclick="closeModal();submitResult('${sw.id}')">${I.plus} Submit result</button>`:''}
+      </div>
+      <div style="background:var(--s3);border-radius:var(--r-sm);padding:11px 14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11.5px;font-family:var(--mono);color:var(--green)">swaptrack.gg/s/${sw.id}</span>
+        <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="navigator.clipboard.writeText('swaptrack.gg/s/${sw.id}');toast('Link copied')">${I.copy} Copy</button>
+      </div>
+    </div>
+  </div>`
+}
+
+function mPlayer(id){
+  const p=APP.players.find(x=>x.id===id);if(!p)return'';
+  const hist=APP.swaps.filter(s=>s.partner_id===p.id);
+  const hbal=hist.reduce((a,s)=>a+(calcBal(s)||0),0);
+  return`<div class="overlay" onclick="closeModal(event)">
+    <div class="modal modal-lg" onclick="event.stopPropagation()">
+      <div class="mhd">Player Profile <button onclick="closeModal()" style="color:var(--t3)">${I.x}</button></div>
+      <div class="profile-hero">
+        <div style="display:flex;align-items:flex-start;gap:14px">
+          ${av(p,52)}
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+              <span style="font-family:var(--display);font-size:19px;font-weight:800">${p.username}</span>
+              ${p.is_pro?`<span class="badge b-green">${I.crown} Pro</span>`:''}
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">${(p.rooms||[]).map(rtag).join('')}</div>
+          </div>
+          ${trustCircle(p.trust_score||50,52)}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px">
+          ${[['ROI',`${(p.roi||0)>=0?'+':''}${p.roi||0}%`,pclr(p.roi||0)],['Games',''+(p.games||0),'var(--t1)'],['ITM',((p.itm||0)+'%'),'var(--t1)']].map(([l,v,c])=>`<div style="background:rgba(0,0,0,.2);border-radius:7px;padding:10px;text-align:center"><div style="font-size:15px;font-weight:600;font-family:var(--mono);color:${c}">${v}</div><div style="font-size:9.5px;color:var(--t3);margin-top:2px">${l}</div></div>`).join('')}
+        </div>
+      </div>
+      ${p.bio?`<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--t3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Bio</div><div style="font-size:13px;color:var(--t2);line-height:1.7">${p.bio}</div></div>`:''}
+      ${hist.length?`<div style="background:var(--s3);border-radius:var(--r-sm);padding:13px 16px;margin-bottom:14px;display:flex;gap:24px"><div><div style="font-family:var(--mono);font-size:17px;font-weight:600">${hist.length}</div><div style="font-size:10px;color:var(--t3)">swaps together</div></div><div><div style="font-family:var(--mono);font-size:17px;font-weight:600;color:${clr(hbal)}">${fm(hbal)}</div><div style="font-size:10px;color:var(--t3)">net P&L</div></div></div>`:''}
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" style="flex:1" onclick="closeModal();openModal('offer-send','${p.id}')">${I.send} Send offer</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>`
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function navigate(pg){APP.page=pg;APP.modal=null;render();window.scrollTo(0,0)}
+function openModal(type,data){APP.modal=type;APP.mdata=data||null;render()}
+function closeModal(e){if(!e||e.target.classList.contains('overlay')){APP.modal=null;APP.mdata=null;render()}}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────────────
+function render(){
+  if(APP.loading){document.getElementById('root').innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center"><div class="spin"></div></div>`;return}
+  if(!APP.session){document.getElementById('root').innerHTML=renderAuth();return}
+
+  const nav=[
+    {id:'dashboard',label:'Dashboard',ico:'home'},
+    {id:'swaps',label:'Swaps',ico:'swap',notif:APP.swaps.filter(s=>s.status==='pending').length},
+    {id:'players',label:'Find Players',ico:'users'},
+    {id:'offers',label:'Offers',ico:'bell',notif:APP.offers.filter(o=>o.to_id===APP.session?.user.id&&o.status==='pending').length},
+    {id:'dispersion',label:'Dispersion',ico:'dice'},
+    {id:'pricing',label:'Upgrade Pro',ico:'crown'},
+    {id:'profile',label:'My Profile',ico:'shield'},
+  ];
+
+  let page='';
+  if(APP.page==='dashboard')page=pgDashboard();
+  else if(APP.page==='swaps')page=pgSwaps();
+  else if(APP.page==='players')page=pgPlayers();
+  else if(APP.page==='offers')page=pgOffers();
+  else if(APP.page==='dispersion')page=pgDispersion();
+  else if(APP.page==='pricing')page=pgPricing();
+  else if(APP.page==='profile')page=pgProfile();
+
+  let modal='';
+  if(APP.modal==='new-swap')modal=mNewSwap();
+  else if(APP.modal==='offer-send')modal=mOfferSend(APP.mdata);
+  else if(APP.modal==='swap')modal=mSwap(APP.mdata);
+  else if(APP.modal==='player')modal=mPlayer(APP.mdata);
+
+  const pro=APP.profile?.is_pro;
+  document.getElementById('root').innerHTML=`
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sb-logo-wrap">
+          <div class="sb-logo-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+          <div><div class="sb-logo-text">SwapTrack</div><div class="sb-logo-sub">Poker swap manager</div></div>
+        </div>
+        <nav class="sb-nav">
+          <div class="sb-group">Menu</div>
+          ${nav.slice(0,4).map(n=>`<div class="sb-item ${APP.page===n.id?'active':''}" onclick="navigate('${n.id}')">${I[n.ico]} <span>${n.label}</span>${n.notif?`<span class="notif">${n.notif}</span>`:''}</div>`).join('')}
+          <div class="sb-group">Tools</div>
+          ${nav.slice(4,6).map(n=>`<div class="sb-item ${APP.page===n.id?'active':''}" onclick="navigate('${n.id}')">${I[n.ico]} <span>${n.label}</span>${n.id==='pricing'&&!pro?`<span class="badge b-green" style="font-size:9px;margin-left:auto">${I.crown}</span>`:''}</div>`).join('')}
+          <div class="sb-group">Account</div>
+          ${nav.slice(6).map(n=>`<div class="sb-item ${APP.page===n.id?'active':''}" onclick="navigate('${n.id}')">${I[n.ico]} <span>${n.label}</span></div>`).join('')}
+        </nav>
+        <div class="sb-foot">
+          <div class="sb-user" onclick="navigate('profile')">
+            ${av(APP.profile||{username:'?',color:'#1aaf78'},30)}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12.5px;font-weight:500">${APP.profile?.username||'Player'} ${pro?`<span class="badge b-green" style="font-size:9px">${I.crown}</span>`:''}</div>
+              <div style="font-size:10.5px;color:var(--t3)">Trust ${APP.profile?.trust_score||50}</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <main class="main page">${page}</main>
+    </div>
+    ${modal}`;
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>
